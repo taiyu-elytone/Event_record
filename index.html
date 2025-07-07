@@ -3,54 +3,41 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>📷 二維碼掃描及資料管理</title>
-  <script src="https://unpkg.com/html5-qrcode" defer></script>
-  <script src="https://code.jquery.com/jquery-3.7.0.min.js" defer></script>
-  <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css">
-  <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js" defer></script>
+  <title>🔖 標籤資料上傳工具</title>
   <style>
-    body { font-family: 'Segoe UI', sans-serif; background:#f5f5f5; padding:20px; }
-    nav button { margin:5px; padding:8px 16px; border:none; border-radius:6px; background:#4CAF50; color:white; cursor:pointer; }
-    nav button:hover { background:#45a049; }
-    #reader, #readerQuery { max-width:350px; margin:auto; }
-    #result, #latestRecord { background:#e0ffe0; margin-top:20px; padding:10px; border-radius:8px; white-space:pre-line; }
-    .tag-panel { margin-top:15px; }
-    .tag-input { margin-bottom:10px; }
-    .upload-btn { margin-top:10px; padding:10px 20px; background:#2196F3; color:white; border:none; border-radius:6px; cursor:pointer; }
+    body { font-family: 'Segoe UI', sans-serif; background:#f9f9f9; padding:20px; }
+    h2 { margin-bottom: 10px; }
+    .tag-button { margin:5px; padding:10px 16px; border-radius:6px; border:1px solid #4CAF50; background:white; cursor:pointer; }
+    .tag-button.active { background:#c8e6c9; }
+    #tagPanel { margin-top:20px; }
+    .input-field { margin-bottom: 10px; }
+    .upload-btn { margin-top:15px; padding:10px 20px; background:#2196F3; color:white; border:none; border-radius:6px; cursor:pointer; }
+    #statusBox { margin-top:20px; padding:10px; border-radius:8px; background:#e0f7fa; white-space:pre-line; }
   </style>
 </head>
 <body>
-  <h2>📸 二維碼掃描及資料管理</h2>
-  <nav>
-    <button onclick="switchMode('scan')">掃碼上傳</button>
-    <button onclick="switchMode('query')">掃碼查詢</button>
-  </nav>
 
-  <div id="scanSection">
-    <div id="reader"></div>
-    <div id="tagPanel" class="tag-panel">載入中，請稍候...</div>
-    <div>
-      <label>備註：</label>
-      <input type="text" id="globalNote" placeholder="輸入備註" style="width:80%; padding:5px;">
-    </div>
-    <button class="upload-btn" onclick="uploadData()">📤 上傳資料</button>
-    <div id="result">掃描結果會顯示在這裡</div>
-    <div id="latestRecord">上次紀錄會顯示在這裡</div>
-    <div id="loadingText"></div>
-  </div>
+<h2>🔖 標籤資料上傳工具</h2>
+<div id="tagButtons">標籤載入中...</div>
+<div id="tagPanel">請點選上方標籤按鈕</div>
 
-  <div id="querySection" style="display:none;">
-    <div id="readerQuery"></div>
-    <div id="queryTable">請掃碼後查詢</div>
-    <div id="queryLoading"></div>
-  </div>
+<div class="input-field">
+  <label>備註：</label>
+  <input type="text" id="globalNote" placeholder="請輸入備註" style="width:80%; padding:5px;">
+</div>
+
+<button class="upload-btn" onclick="uploadData()">📤 上傳資料</button>
+
+<div id="statusBox">狀態顯示區</div>
 
 <script>
-let lastScanned = "";
-let currentMode = "scan";
-const scriptUrl = "https://script.google.com/macros/s/AKfycbyN49RSqSW6T4hroGFgCd0l-ql0WPl8rAIwy3hLRCtR2kbytEcaT7V_Dqik05grx_J5/exec";
-let tagData = {};
+const scriptUrl = "https://script.google.com/macros/s/AKfycbwn0W0W1_0pI_jRbFuXr0JMT6vy-uRPFcQNLckxiMhTFrrBRseyADsPZl3HbdzEGdG8/exec";
 
+let tagData = {};          // 儲存標籤與選項
+let selectedValues = {};   // 儲存使用者輸入
+let activeTag = "";        // 目前點選的 tag 名稱
+
+// 載入標籤
 function loadTags() {
   fetch(`${scriptUrl}?action=ItemList`)
     .then(res => res.json())
@@ -60,142 +47,97 @@ function loadTags() {
           const tag = row[0]?.trim();
           if (tag) tagData[tag] = true;
         });
-        renderInputFields();
+        renderTagButtons();
       } else {
-        document.getElementById("tagPanel").innerText = "⚠️ 資料格式錯誤";
+        document.getElementById("tagButtons").innerText = "⚠️ 標籤資料格式錯誤";
       }
     })
     .catch(err => {
-      console.error("讀取ItemList失敗", err);
-      document.getElementById("tagPanel").innerText = "⚠️ 無法讀取標籤資料";
+      console.error("讀取標籤失敗", err);
+      document.getElementById("tagButtons").innerText = "❌ 無法載入標籤，請稍後再試";
     });
 }
 
-function renderInputFields() {
-  const panel = document.getElementById("tagPanel");
-  panel.innerHTML = "";
+// 產生標籤按鈕
+function renderTagButtons() {
+  const btnContainer = document.getElementById("tagButtons");
+  btnContainer.innerHTML = "";
   Object.keys(tagData).forEach(tag => {
-    const div = document.createElement("div");
-    div.className = "tag-input";
-    div.innerHTML = `
-      <label>${tag}：</label>
-      <input type="text" id="input-${tag}" placeholder="請輸入${tag}" style="padding:5px; width:70%;">
-    `;
-    panel.appendChild(div);
+    const btn = document.createElement("button");
+    btn.className = "tag-button";
+    btn.innerText = tag;
+    btn.id = `btn-${tag}`;
+    btn.addEventListener("click", () => toggleTag(tag));
+    btnContainer.appendChild(btn);
   });
 }
 
-function uploadData() {
-  if (!lastScanned) {
-    alert("⚠️ 請先掃描一個 QRCode！");
-    return;
-  }
-
-  let noteParts = [];
-  Object.keys(tagData).forEach(tag => {
-    const value = document.getElementById(`input-${tag}`)?.value?.trim();
-    if (value) noteParts.push(`${tag}:${value}`);
+// 點選標籤 → 顯示輸入欄位
+function toggleTag(tag) {
+  activeTag = tag;
+  console.log(`點選標籤: ${tag}`);
+  
+  // 清除按鈕樣式
+  Object.keys(tagData).forEach(t => {
+    const btn = document.getElementById(`btn-${t}`);
+    if (btn) btn.classList.remove("active");
   });
 
-  const extraNote = document.getElementById("globalNote").value?.trim();
+  const thisBtn = document.getElementById(`btn-${tag}`);
+  if (thisBtn) thisBtn.classList.add("active");
+
+  const panel = document.getElementById("tagPanel");
+  panel.innerHTML = `
+    <label>${tag}：</label>
+    <input type="text" id="input-${tag}" placeholder="請輸入 ${tag}" style="padding:5px; width:70%;">
+  `;
+
+  // 若之前輸入過，自動填入
+  if (selectedValues[tag]) {
+    document.getElementById(`input-${tag}`).value = selectedValues[tag];
+  }
+
+  // 綁定 change
+  document.getElementById(`input-${tag}`).onchange = e => {
+    selectedValues[tag] = e.target.value.trim();
+    console.log(`選擇 ${tag}: ${e.target.value.trim()}`);
+  };
+}
+
+// 點選「上傳」按鈕
+function uploadData() {
+  let noteParts = [];
+  Object.entries(selectedValues).forEach(([k, v]) => {
+    if (v) noteParts.push(`${k}:${v}`);
+  });
+
+  const extraNote = document.getElementById("globalNote").value.trim();
   const finalNote = noteParts.join(", ") + (noteParts.length && extraNote ? ", " : "") + extraNote;
 
-  document.getElementById("loadingText").innerText = "⬆️ 正在上傳...";
+  if (!finalNote) {
+    alert("⚠️ 請至少填寫一個欄位或備註");
+    return;
+  }
 
-  fetch(`${scriptUrl}?action=WriteData&text=${encodeURIComponent(lastScanned)}&note=${encodeURIComponent(finalNote)}`)
+  document.getElementById("statusBox").innerText = "⏳ 資料上傳中...";
+
+  fetch(`${scriptUrl}?action=WriteData&text=ManualInput&note=${encodeURIComponent(finalNote)}`)
     .then(res => res.text())
-    .then(result => {
-      document.getElementById("loadingText").innerText = `✅ 上傳成功：${result}`;
-      lastScanned = "";
+    .then(msg => {
+      document.getElementById("statusBox").innerText = `✅ 上傳成功：${msg}`;
+      selectedValues = {};
+      document.getElementById("globalNote").value = "";
+      document.getElementById("tagPanel").innerHTML = "請點選上方標籤按鈕";
     })
     .catch(err => {
-      document.getElementById("loadingText").innerText = `❌ 上傳失敗：${err.message}`;
+      console.error(err);
+      document.getElementById("statusBox").innerText = `❌ 上傳失敗：${err.message}`;
     });
 }
 
-async function onScanSuccess(decodedText) {
-  if (decodedText === lastScanned) return;
-  lastScanned = decodedText;
-  document.getElementById('result').innerText = `📦 掃描成功：${decodedText}`;
-  document.getElementById('loadingText').innerText = "";
-
-  try {
-    const res = await fetch(`${scriptUrl}?action=LatestDataFilter&filter=${encodeURIComponent(decodedText)}`);
-    const json = await res.json();
-    const note = json?.data?.備註 || "";
-    const date = json?.data?.日期 || "無";
-    document.getElementById("latestRecord").innerText = `📄 上次紀錄：${date}\n備註：${note || "無"}`;
-  } catch {
-    document.getElementById("latestRecord").innerText = "❌ 無法取得上次紀錄";
-  }
-}
-
-async function onQueryScan(decodedText) {
-  if (decodedText === lastScanned) return;
-  lastScanned = decodedText;
-  document.getElementById("queryLoading").innerText = "🔎 查詢中...";
-  try {
-    const res = await fetch(`${scriptUrl}?action=DataFilter&filter=${encodeURIComponent(decodedText)}`);
-    const json = await res.json();
-    if (!Array.isArray(json.data) || json.data.length === 0) {
-      document.getElementById("queryTable").innerHTML = "⚠️ 沒有找到歷史紀錄";
-    } else {
-      renderQueryTable(json.data);
-    }
-    document.getElementById("queryLoading").innerText = "";
-    setTimeout(() => { lastScanned = ""; }, 3000);
-  } catch (err) {
-    document.getElementById("queryLoading").innerText = `❌ 查詢失敗：${err.message}`;
-  }
-}
-
-function renderQueryTable(data) {
-  const targetDiv = document.getElementById("queryTable");
-  if (!Array.isArray(data) || data.length === 0) {
-    targetDiv.innerHTML = "⚠️ 沒有資料";
-    return;
-  }
-  if ($.fn.DataTable.isDataTable("#queryDataTable")) {
-    $("#queryDataTable").DataTable().destroy();
-    $("#queryDataTable").empty();
-  }
-  let html = `<table id="queryDataTable" class="display"><thead><tr>`;
-  data[0].forEach(th => html += `<th>${th}</th>`);
-  html += "</tr></thead><tbody>";
-  data.slice(1).reverse().forEach(row => {
-    html += "<tr>";
-    row.forEach(cell => html += `<td>${cell}</td>`);
-    html += "</tr>";
-  });
-  html += "</tbody></table>";
-  targetDiv.innerHTML = html;
-  $("#queryDataTable").DataTable({
-    pageLength: 10,
-    language: { url: "//cdn.datatables.net/plug-ins/1.13.6/i18n/zh-HANT.json" }
-  });
-}
-
-function switchMode(mode) {
-  currentMode = mode;
-  if (mode === "scan") {
-    document.getElementById("scanSection").style.display = "block";
-    document.getElementById("querySection").style.display = "none";
-    scanner.render(onScanSuccess);
-    scannerQuery.clear();
-  } else if (mode === "query") {
-    document.getElementById("scanSection").style.display = "none";
-    document.getElementById("querySection").style.display = "block";
-    scannerQuery.render(onQueryScan);
-    scanner.clear();
-  }
-}
-
-document.addEventListener("DOMContentLoaded", () => {
-  loadTags();
-  scanner = new Html5QrcodeScanner("reader", { fps: 10, qrbox: { width: 250, height: 250 } }, false);
-  scannerQuery = new Html5QrcodeScanner("readerQuery", { fps: 10, qrbox: { width: 250, height: 250 } }, false);
-  scanner.render(onScanSuccess);
-});
+// 初始化
+document.addEventListener("DOMContentLoaded", loadTags);
 </script>
+
 </body>
 </html>

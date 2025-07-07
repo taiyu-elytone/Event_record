@@ -20,24 +20,23 @@
 <h2>🔖 標籤資料上傳工具</h2>
 <div id="tagButtons">標籤載入中...</div>
 <div id="tagPanel">請點選上方標籤按鈕</div>
-
-<div class="input-field">
-  <label>備註：</label>
-  <input type="text" id="globalNote" placeholder="請輸入備註" style="width:80%; padding:5px;">
+<div id="customTagSection" style="margin-top:10px; display:none;">
+  <label>新增標籤名稱：</label>
+  <input type="text" id="customTagName" placeholder="請輸入標籤名稱" style="padding:5px; width:70%;">
 </div>
-
+<div class="input-field">
+  <label>輸入內容：</label>
+  <input type="text" id="tagValue" placeholder="請輸入內容" style="width:80%; padding:5px;">
+</div>
 <button class="upload-btn" onclick="uploadData()">📤 上傳資料</button>
-
 <div id="statusBox">狀態顯示區</div>
 
 <script>
 const scriptUrl = "https://script.google.com/macros/s/AKfycbwn0W0W1_0pI_jRbFuXr0JMT6vy-uRPFcQNLckxiMhTFrrBRseyADsPZl3HbdzEGdG8/exec";
 
-let tagData = {};          // 儲存標籤與選項
-let selectedValues = {};   // 儲存使用者輸入
-let activeTag = "";        // 目前點選的 tag 名稱
+let tagData = {};          // 儲存標籤名稱
+let selectedTag = "";
 
-// 載入標籤
 function loadTags() {
   fetch(`${scriptUrl}?action=ItemList`)
     .then(res => res.json())
@@ -58,7 +57,6 @@ function loadTags() {
     });
 }
 
-// 產生標籤按鈕
 function renderTagButtons() {
   const btnContainer = document.getElementById("tagButtons");
   btnContainer.innerHTML = "";
@@ -67,67 +65,65 @@ function renderTagButtons() {
     btn.className = "tag-button";
     btn.innerText = tag;
     btn.id = `btn-${tag}`;
-    btn.addEventListener("click", () => toggleTag(tag));
+    btn.addEventListener("click", () => selectTag(tag));
     btnContainer.appendChild(btn);
   });
+
+  // 加入自訂標籤按鈕
+  const customBtn = document.createElement("button");
+  customBtn.className = "tag-button";
+  customBtn.innerText = "其他";
+  customBtn.id = "btn-custom";
+  customBtn.addEventListener("click", () => selectTag("__custom__"));
+  btnContainer.appendChild(customBtn);
 }
 
-// 點選標籤 → 顯示輸入欄位
-function toggleTag(tag) {
-  activeTag = tag;
-  console.log(`點選標籤: ${tag}`);
-  
-  // 清除按鈕樣式
+function selectTag(tag) {
+  selectedTag = tag;
   Object.keys(tagData).forEach(t => {
     const btn = document.getElementById(`btn-${t}`);
     if (btn) btn.classList.remove("active");
   });
+  const customBtn = document.getElementById("btn-custom");
+  if (customBtn) customBtn.classList.remove("active");
 
-  const thisBtn = document.getElementById(`btn-${tag}`);
-  if (thisBtn) thisBtn.classList.add("active");
-
-  const panel = document.getElementById("tagPanel");
-  panel.innerHTML = `
-    <label>${tag}：</label>
-    <input type="text" id="input-${tag}" placeholder="請輸入 ${tag}" style="padding:5px; width:70%;">
-  `;
-
-  // 若之前輸入過，自動填入
-  if (selectedValues[tag]) {
-    document.getElementById(`input-${tag}`).value = selectedValues[tag];
+  if (tag === "__custom__") {
+    document.getElementById("customTagSection").style.display = "block";
+    customBtn.classList.add("active");
+  } else {
+    document.getElementById("customTagSection").style.display = "none";
+    const thisBtn = document.getElementById(`btn-${tag}`);
+    if (thisBtn) thisBtn.classList.add("active");
   }
-
-  // 綁定 change
-  document.getElementById(`input-${tag}`).onchange = e => {
-    selectedValues[tag] = e.target.value.trim();
-    console.log(`選擇 ${tag}: ${e.target.value.trim()}`);
-  };
 }
 
-// 點選「上傳」按鈕
 function uploadData() {
-  let noteParts = [];
-  Object.entries(selectedValues).forEach(([k, v]) => {
-    if (v) noteParts.push(`${k}:${v}`);
-  });
+  const value = document.getElementById("tagValue").value.trim();
+  const customName = document.getElementById("customTagName").value.trim();
 
-  const extraNote = document.getElementById("globalNote").value.trim();
-  const finalNote = noteParts.join(", ") + (noteParts.length && extraNote ? ", " : "") + extraNote;
+  let title = selectedTag;
+  if (title === "__custom__") {
+    if (!customName) {
+      alert("⚠️ 請輸入自訂標籤名稱");
+      return;
+    }
+    title = customName;
+  }
 
-  if (!finalNote) {
-    alert("⚠️ 請至少填寫一個欄位或備註");
+  if (!title || !value) {
+    alert("⚠️ 請選擇標籤並輸入內容");
     return;
   }
 
-  document.getElementById("statusBox").innerText = "⏳ 資料上傳中...";
+  document.getElementById("statusBox").innerText = "⏳ 上傳中...";
 
-  fetch(`${scriptUrl}?action=WriteData&text=ManualInput&note=${encodeURIComponent(finalNote)}`)
+  fetch(`${scriptUrl}?action=WriteData&text=ManualInput&title=${encodeURIComponent(title)}&note=${encodeURIComponent(value)}`)
     .then(res => res.text())
     .then(msg => {
       document.getElementById("statusBox").innerText = `✅ 上傳成功：${msg}`;
-      selectedValues = {};
-      document.getElementById("globalNote").value = "";
-      document.getElementById("tagPanel").innerHTML = "請點選上方標籤按鈕";
+      document.getElementById("tagValue").value = "";
+      document.getElementById("customTagName").value = "";
+      selectedTag = "";
     })
     .catch(err => {
       console.error(err);
@@ -135,7 +131,6 @@ function uploadData() {
     });
 }
 
-// 初始化
 document.addEventListener("DOMContentLoaded", loadTags);
 </script>
 

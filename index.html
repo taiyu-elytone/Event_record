@@ -32,7 +32,7 @@
 <div id="statusBox">狀態顯示區</div>
 
 <script>
-const scriptUrl = "https://script.google.com/macros/s/AKfycbwn0W0W1_0pI_jRbFuXr0JMT6vy-uRPFcQNLckxiMhTFrrBRseyADsPZl3HbdzEGdG8/exec";
+const scriptUrl = "https://script.google.com/macros/s/AKfycbyW18NlqYE_NoAuHrsNel-tTLoVzm_ESwypjKGWZVE9DSUMBWXqzy7gvbSalGm_zrl3/exec";
 
 let tagData = {};          // 儲存標籤名稱
 let selectedTag = "";
@@ -117,7 +117,7 @@ function uploadData() {
 
   document.getElementById("statusBox").innerText = "⏳ 上傳中...";
 
-  fetch(`${scriptUrl}?action=WriteData&text=ManualInput&title=${encodeURIComponent(title)}&note=${encodeURIComponent(value)}`)
+  fetch(`${scriptUrl}?action=WriteData&title=${encodeURIComponent(title)}&note=${encodeURIComponent(value)}`)
     .then(res => res.text())
     .then(msg => {
       document.getElementById("statusBox").innerText = `✅ 上傳成功：${msg}`;

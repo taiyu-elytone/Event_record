@@ -124,6 +124,17 @@ function uploadData() {
       document.getElementById("tagValue").value = "";
       document.getElementById("customTagName").value = "";
       selectedTag = "";
+
+      // 清除所有按鈕的 active 樣式
+      Object.keys(tagData).forEach(t => {
+        const btn = document.getElementById(`btn-${t}`);
+        if (btn) btn.classList.remove("active");
+      });
+      const customBtn = document.getElementById("btn-custom");
+      if (customBtn) customBtn.classList.remove("active");
+
+      // 隱藏自訂標籤輸入欄
+      document.getElementById("customTagSection").style.display = "none";
     })
     .catch(err => {
       console.error(err);
